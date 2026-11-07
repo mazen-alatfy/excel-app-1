@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Helpers\ApiResponse;
+use App\Jobs\SendContactsFileJob;
 use App\Services\ContactService;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
@@ -10,32 +11,20 @@ use Illuminate\Http\Request;
 
 class ContactController extends Controller
 {
-    public function upload(Request $request, ContactService $contactService): JsonResponse
+    public function upload(Request $request): JsonResponse
     {
         $request->validate([
             'file' => ['required', 'file', 'mimes:xlsx,xls', 'max:5120'],
         ]);
 
-        try {
-            $receiverResponse = $contactService->sendFile($request->file('file'));
-        } catch (ConnectionException) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Cannot reach the receiver service.',
-            ], 502);
-        }
+        $file = $request->file('file');
+        $path = $file->store('contact-uploads', 'local');
 
-        if ($receiverResponse->failed()) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'The receiver service rejected the data.',
-                'details' => $receiverResponse->json(),
-            ], 502);
-        }
+        SendContactsFileJob::dispatch($path, $file->getClientOriginalName());
 
         return ApiResponse::success([
-            'receiver_response' => $receiverResponse->json(),
-        ], 'File sent to the receiver service.');
+            'file' => $file->getClientOriginalName(),
+        ], 'File received and queued for processing.', 202);
     }
 
     public function index(ContactService $contactService): JsonResponse

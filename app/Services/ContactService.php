@@ -5,6 +5,7 @@ namespace App\Services;
 use Illuminate\Http\Client\Response;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 
 class ContactService
 {
@@ -16,6 +17,18 @@ class ContactService
                 'file',
                 file_get_contents($file->getRealPath()),
                 $file->getClientOriginalName()
+            )
+            ->post($this->receiverUrl('/api/contacts/import'));
+    }
+
+    public function sendStoredFile(string $path, string $originalName): Response
+    {
+        return Http::acceptJson()
+            ->timeout(60)
+            ->attach(
+                'file',
+                Storage::disk('local')->get($path),
+                $originalName
             )
             ->post($this->receiverUrl('/api/contacts/import'));
     }
